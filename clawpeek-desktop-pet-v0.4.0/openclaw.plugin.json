@@ -1,0 +1,119 @@
+{
+  "id": "clawpeek-desktop-pet",
+  "name": "ClawPeek 2D 桌宠",
+  "description": "2D 龙虾桌宠：自动连接 OpenClaw，可拖动；单击可打开 Gateway Chat 或 CLI TUI，双击打开控制面板。",
+  "version": "0.4.0",
+  "author": "OpenAI",
+  "license": "MIT",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "是否启用桌宠"
+      },
+      "alwaysOnTop": {
+        "type": "boolean",
+        "default": true,
+        "description": "桌宠窗口是否置顶"
+      },
+      "gatewayUrl": {
+        "type": "string",
+        "default": "ws://127.0.0.1:18789",
+        "description": "OpenClaw Gateway WebSocket 地址。留空时会尝试自动推导。"
+      },
+      "gatewayToken": {
+        "type": "string",
+        "default": "",
+        "description": "可选：手动指定 Gateway Token。留空时会优先自动从环境变量、.env、CLI 或配置文件读取。"
+      },
+      "gatewayTokenFile": {
+        "type": "string",
+        "default": "",
+        "description": "可选：从文件读取 Gateway Token。"
+      },
+      "gatewayPassword": {
+        "type": "string",
+        "default": "",
+        "description": "可选：如果 Gateway 使用 password auth，可在这里手动填写。"
+      },
+      "gatewayPasswordFile": {
+        "type": "string",
+        "default": "",
+        "description": "可选：从文件读取 Gateway Password。"
+      },
+      "controlUiBaseUrl": {
+        "type": "string",
+        "default": "",
+        "description": "可选：OpenClaw Control UI 基础地址。留空时会尝试自动推导。"
+      },
+      "mainSessionKey": {
+        "type": "string",
+        "default": "main",
+        "description": "主会话 session key"
+      },
+      "clickAction": {
+        "type": "string",
+        "enum": [
+          "gateway-chat",
+          "cli-tui"
+        ],
+        "default": "gateway-chat",
+        "description": "桌宠单击时默认打开哪种聊天入口。运行时也可以在托盘菜单中切换。"
+      },
+      "cliCommand": {
+        "type": "string",
+        "default": "",
+        "description": "可选：自定义命令行聊天命令模板。可用占位符：{{executable}} {{gatewayUrl}} {{sessionKey}} {{token}} {{password}} {{authArgs}}"
+      },
+      "petCorner": {
+        "type": "string",
+        "enum": [
+          "bottom-right",
+          "bottom-left",
+          "top-right",
+          "top-left"
+        ],
+        "default": "bottom-right",
+        "description": "桌宠默认出现的角落"
+      },
+      "petSize": {
+        "type": "integer",
+        "minimum": 180,
+        "maximum": 360,
+        "default": 240,
+        "description": "桌宠窗口尺寸"
+      },
+      "dashboardWidth": {
+        "type": "integer",
+        "minimum": 900,
+        "maximum": 1600,
+        "default": 1120,
+        "description": "控制面板宽度"
+      },
+      "dashboardHeight": {
+        "type": "integer",
+        "minimum": 700,
+        "maximum": 1200,
+        "default": 840,
+        "description": "控制面板高度"
+      },
+      "chatWidth": {
+        "type": "integer",
+        "minimum": 980,
+        "maximum": 1800,
+        "default": 1260,
+        "description": "OpenClaw 聊天窗口宽度"
+      },
+      "chatHeight": {
+        "type": "integer",
+        "minimum": 680,
+        "maximum": 1400,
+        "default": 860,
+        "description": "OpenClaw 聊天窗口高度"
+      }
+    }
+  }
+}

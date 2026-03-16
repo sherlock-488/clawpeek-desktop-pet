@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self' ws: wss: http: https:;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClawPeek 2D 桌宠</title>
+    <link rel="stylesheet" href="./pet.css" />
+  </head>
+  <body>
+    <main id="pet-root" class="pet-root" data-phase="idle" data-activity="none">
+      <button id="pet-button" class="pet-stage" title="拖动移动，点击打开龙虾控制面板" aria-label="拖动移动，点击打开龙虾控制面板">
+        <div class="pet-shadow"></div>
+        <div id="overlay-bubble" class="overlay-bubble" aria-hidden="true">
+          <span id="overlay-icon" class="overlay-icon">🦞</span>
+          <span id="overlay-text" class="overlay-text">处理中</span>
+        </div>
+
+        <svg class="pet-art" viewBox="0 0 240 240" role="img" aria-hidden="true">
+          <defs>
+            <linearGradient id="shellGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ff9f7a" />
+              <stop offset="60%" stop-color="#ff6b57" />
+              <stop offset="100%" stop-color="#d93d41" />
+            </linearGradient>
+            <linearGradient id="shellCool" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ffb38a" />
+              <stop offset="100%" stop-color="#f26450" />
+            </linearGradient>
+            <filter id="softGlow">
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <g class="fx fx-halo">
+            <circle cx="120" cy="122" r="72" />
+          </g>
+
+          <g class="lobster-shell">
+            <g class="tail-group">
+              <path class="tail fin-1" d="M103 156 C90 172 88 186 101 198 C108 187 111 174 112 164 Z" />
+              <path class="tail fin-2" d="M120 162 C114 179 117 193 120 203 C123 193 126 179 120 162 Z" />
+              <path class="tail fin-3" d="M137 156 C149 172 151 186 139 198 C132 187 129 174 128 164 Z" />
+            </g>
+
+            <g class="leg-group left-legs">
+              <path class="leg" d="M86 128 C65 132 56 144 46 160" />
+              <path class="leg" d="M84 140 C60 148 50 164 42 182" />
+              <path class="leg" d="M90 151 C70 165 62 179 58 197" />
+            </g>
+            <g class="leg-group right-legs">
+              <path class="leg" d="M154 128 C175 132 184 144 194 160" />
+              <path class="leg" d="M156 140 C180 148 190 164 198 182" />
+              <path class="leg" d="M150 151 C170 165 178 179 182 197" />
+            </g>
+
+            <g class="claw left-claw">
+              <path class="arm" d="M90 108 C64 93 51 83 42 63" />
+              <path class="pincer top" d="M40 62 C18 45 22 24 48 26 C48 38 46 50 40 62 Z" />
+              <path class="pincer bottom" d="M40 62 C12 73 15 95 45 93 C42 82 41 72 40 62 Z" />
+            </g>
+            <g class="claw right-claw">
+              <path class="arm" d="M150 108 C176 93 189 83 198 63" />
+              <path class="pincer top" d="M200 62 C222 45 218 24 192 26 C192 38 194 50 200 62 Z" />
+              <path class="pincer bottom" d="M200 62 C228 73 225 95 195 93 C198 82 199 72 200 62 Z" />
+            </g>
+
+            <ellipse class="body" cx="120" cy="128" rx="46" ry="38" />
+            <ellipse class="body body-highlight" cx="108" cy="114" rx="12" ry="8" />
+            <ellipse class="head" cx="120" cy="86" rx="28" ry="24" />
+            <path class="head-plate" d="M94 86 C100 62 140 62 146 86" />
+
+            <g class="antenna antenna-left">
+              <path d="M108 61 C92 34 83 24 68 16" />
+            </g>
+            <g class="antenna antenna-right">
+              <path d="M132 61 C148 34 157 24 172 16" />
+            </g>
+
+            <g class="eyes eyes-open">
+              <circle cx="108" cy="84" r="5" class="eye-white" />
+              <circle cx="132" cy="84" r="5" class="eye-white" />
+              <circle cx="108" cy="84" r="2.3" class="eye-pupil" />
+              <circle cx="132" cy="84" r="2.3" class="eye-pupil" />
+            </g>
+            <g class="eyes eyes-sleep">
+              <path d="M101 84 C105 80 111 80 115 84" />
+              <path d="M125 84 C129 80 135 80 139 84" />
+            </g>
+            <g class="eyes eyes-angry">
+              <path d="M101 88 L115 80" />
+              <path d="M125 80 L139 88" />
+            </g>
+            <g class="eyes eyes-happy">
+              <path d="M101 82 C105 89 111 89 115 82" />
+              <path d="M125 82 C129 89 135 89 139 82" />
+            </g>
+            <g class="eyes eyes-dizzy">
+              <path d="M103 79 L113 89 M113 79 L103 89" />
+              <path d="M127 79 L137 89 M137 79 L127 89" />
+            </g>
+
+            <path class="mouth mouth-neutral" d="M112 98 C117 102 123 102 128 98" />
+            <path class="mouth mouth-wow" d="M120 103 m -4 0 a 4 4 0 1 0 8 0 a 4 4 0 1 0 -8 0" />
+          </g>
+
+          <g class="fx fx-think">
+            <circle cx="182" cy="66" r="6" />
+            <circle cx="196" cy="53" r="5" />
+            <circle cx="208" cy="41" r="4" />
+          </g>
+
+          <g class="fx fx-wait">
+            <path d="M188 35 C188 19 202 14 210 22 C216 28 216 38 211 44 C208 48 204 50 203 55" />
+            <circle cx="203" cy="64" r="3" />
+          </g>
+
+          <g class="fx fx-check" filter="url(#softGlow)">
+            <path d="M184 67 L198 81 L220 49" />
+          </g>
+
+          <g class="fx fx-alert" filter="url(#softGlow)">
+            <path d="M202 31 L218 66 L186 66 Z" />
+            <line x1="202" y1="42" x2="202" y2="56" />
+            <circle cx="202" cy="61" r="2.5" />
+          </g>
+
+          <g class="fx fx-zzz">
+            <text x="176" y="58">Z</text>
+            <text x="191" y="42">Z</text>
+            <text x="204" y="26">Z</text>
+          </g>
+
+          <g class="fx fx-stars">
+            <path d="M48 44 L52 54 L63 58 L52 62 L48 72 L44 62 L33 58 L44 54 Z" />
+            <path d="M196 112 L199 119 L207 122 L199 125 L196 132 L193 125 L185 122 L193 119 Z" />
+            <path d="M173 39 L175 44 L180 46 L175 48 L173 53 L171 48 L166 46 L171 44 Z" />
+          </g>
+        </svg>
+      </button>
+    </main>
+    <script type="module" src="./pet.js"></script>
+  </body>
+</html>

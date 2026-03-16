@@ -1,0 +1,11 @@
+{
+  "name": "clawpeek-desktop-pet-workspace",
+  "private": true,
+  "description": "Workspace wrapper for the nested ClawPeek desktop pet app.",
+  "scripts": {
+    "install:app": "npm --prefix clawpeek-desktop-pet-v0.4.0 install",
+    "start": "npm --prefix clawpeek-desktop-pet-v0.4.0 start",
+    "dev": "npm --prefix clawpeek-desktop-pet-v0.4.0 dev",
+    "test": "npm --prefix clawpeek-desktop-pet-v0.4.0 test"
+  }
+}

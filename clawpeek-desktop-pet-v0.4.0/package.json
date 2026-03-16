@@ -1,0 +1,25 @@
+{
+  "name": "clawpeek-desktop-pet",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "2D OpenClaw desktop pet that auto-connects through the Electron main process, supports dragging, and can open either Gateway chat or CLI TUI on click.",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node scripts/start-electron.cjs",
+    "dev": "node scripts/start-electron.cjs --enable-logging",
+    "test": "node --test"
+  },
+  "openclaw": {
+    "id": "clawpeek-desktop-pet",
+    "extensions": [
+      "./index.mjs"
+    ]
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self' ws: wss: http: https:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClawPeek</title>
+    <link rel="stylesheet" href="../src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="page-header">
+        <div class="header-copy">
+          <p class="eyebrow">ClawPeek</p>
+          <h1 id="page-title">控制面板</h1>
+          <div class="header-status-row">
+            <span id="connection-pill" class="pill neutral">Disconnected</span>
+          </div>
+        </div>
+
+        <div id="lang-switch" class="lang-switch header-lang-switch" role="group" aria-label="Language switch">
+          <button id="lang-button-zh" type="button" class="lang-button" data-lang="zh">中文</button>
+          <button id="lang-button-en" type="button" class="lang-button" data-lang="en">EN</button>
+        </div>
+      </header>
+
+      <main class="dashboard-grid dashboard-grid-compact">
+        <section class="surface-card status-panel">
+          <div class="panel-head">
+            <div>
+              <p id="status-section-label" class="section-label">Current Status</p>
+              <h2 id="status-section-title">State and usage</h2>
+            </div>
+          </div>
+
+          <div id="status-summary" class="status-summary"></div>
+          <div id="status-metrics" class="metrics compact-metrics"></div>
+        </section>
+
+        <section class="surface-card events-panel events-panel-side">
+          <div class="panel-head">
+            <div>
+              <p id="events-section-label" class="section-label">Recent Log</p>
+              <h2 id="events-section-title">Event Stream</h2>
+            </div>
+          </div>
+          <div class="events-scroll-shell">
+            <ol id="event-log" class="event-log"></ol>
+          </div>
+        </section>
+      </main>
+
+      <footer id="footer-quote" class="footer-quote" aria-live="polite"></footer>
+    </div>
+
+    <script type="module" src="./dashboard.js"></script>
+  </body>
+</html>
