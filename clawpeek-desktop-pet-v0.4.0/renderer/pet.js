@@ -12,13 +12,11 @@ const overlayText = document.getElementById('overlay-text');
 
 const DRAG_THRESHOLD_PX = 6;
 const DRAG_CLICK_SUPPRESS_MS = 260;
-const DOUBLE_CLICK_DELAY_MS = 240;
 
 let ticker = null;
 let activeClient = null;
 let shutdownRequested = false;
 let suppressClickUntil = 0;
-let pendingPrimaryActionTimer = null;
 let pointerState = {
   active: false,
   dragging: false,
@@ -30,9 +28,6 @@ let pointerState = {
 };
 
 const bootstrap = await api.getBootstrapConfig();
-let interactionSettings = {
-  clickAction: normalizeClickAction(bootstrap.clickAction),
-};
 
 const store = createStore({
   settings: {
@@ -77,7 +72,8 @@ function renderPet(state) {
   root.dataset.activity = view.activity;
   root.classList.toggle('show-overlay', view.showOverlay);
   root.classList.toggle('is-dragging', pointerState.dragging);
-  updatePetButtonLabel();
+  petButton.title = `${view.title}（拖动移动，点击打开龙虾控制面板）`;
+  petButton.setAttribute('aria-label', petButton.title);
 
   overlayIcon.textContent = view.overlayIcon;
   overlayText.textContent = view.overlayText;
@@ -155,45 +151,6 @@ async function connect() {
 
 function openLobsterControlPanel() {
   api.openDashboard();
-}
-
-function normalizeClickAction(value) {
-  return value === 'cli-tui' ? 'cli-tui' : 'gateway-chat';
-}
-
-function currentSessionKey() {
-  return store.getState()?.derived?.sessionKey || bootstrap.mainSessionKey || 'main';
-}
-
-function currentPrimaryActionLabel() {
-  return interactionSettings.clickAction === 'cli-tui' ? 'CLI TUI' : 'Gateway Chat';
-}
-
-function updatePetButtonLabel() {
-  const label = `Drag to move. Click to open ${currentPrimaryActionLabel()}. Double-click to open Control Panel.`;
-  petButton.title = label;
-  petButton.setAttribute('aria-label', label);
-}
-
-function clearPendingPrimaryAction() {
-  if (!pendingPrimaryActionTimer) return;
-  window.clearTimeout(pendingPrimaryActionTimer);
-  pendingPrimaryActionTimer = null;
-}
-
-function schedulePrimaryActionOpen() {
-  clearPendingPrimaryAction();
-  pendingPrimaryActionTimer = window.setTimeout(() => {
-    pendingPrimaryActionTimer = null;
-    api.openPrimaryAction(currentSessionKey());
-  }, DOUBLE_CLICK_DELAY_MS);
-}
-
-function applyInteractionSettings(settings = {}) {
-  interactionSettings = {
-    clickAction: normalizeClickAction(settings.clickAction || interactionSettings.clickAction),
-  };
-  updatePetButtonLabel();
 }
 
 function suppressClicks(delayMs = DRAG_CLICK_SUPPRESS_MS) {
@@ -276,25 +233,16 @@ petButton.addEventListener('dragstart', (event) => {
 petButton.addEventListener('click', (event) => {
   event.preventDefault();
   if (shouldIgnoreClick()) return;
-  schedulePrimaryActionOpen();
+  openLobsterControlPanel();
 });
 
 petButton.addEventListener('dblclick', (event) => {
   event.preventDefault();
-  if (shouldIgnoreClick()) return;
-  clearPendingPrimaryAction();
-  openLobsterControlPanel();
 });
 
 window.addEventListener('beforeunload', async () => {
   shutdownRequested = true;
-  clearPendingPrimaryAction();
   await disconnect();
-});
-
-applyInteractionSettings(bootstrap);
-api.onInteractionSettings?.((settings) => {
-  applyInteractionSettings(settings);
 });
 
 dispatch({

@@ -23,7 +23,7 @@ ClawPeek Desktop Pet 是一个基于 Electron 的 OpenClaw 桌宠扩展。它会
 - Gateway 连接放在 Electron 主进程，减少渲染层直接连网带来的兼容问题
 - 自动解析 Gateway URL、Control UI 地址、共享 Token 和 Password
 - OpenClaw 未启动时，宠物保持休息或离线状态，而不是误判成应用崩溃
-- 支持单击打开当前主聊天动作、双击打开控制面板、拖拽移动桌宠
+- 支持点击打开控制面板、拖拽移动桌宠；聊天入口通过托盘菜单打开
 - 尽量使用稳定英文调试标签，减少终端和日志中的乱码
 - 保留足够详细的日志，便于判断上游是否真的触发了工具调用
 
@@ -156,7 +156,7 @@ npm install
 | `gatewayPasswordFile` | 从文件读取 password | `""` |
 | `controlUiBaseUrl` | 手动指定 Control UI 地址 | `""` |
 | `mainSessionKey` | 主会话 key | `"main"` |
-| `clickAction` | 单击桌宠时打开 `gateway-chat` 或 `cli-tui`，也可通过托盘菜单切换 | `"gateway-chat"` |
+| `clickAction` | 设置默认主聊天动作为 `gateway-chat` 或 `cli-tui`，供托盘菜单中的快速打开入口使用，也可通过托盘菜单切换 | `"gateway-chat"` |
 | `cliCommand` | 自定义 CLI TUI 命令模板 | `""` |
 | `petCorner` | 默认出现角落 | `"bottom-right"` |
 | `petSize` | 桌宠尺寸 | `240` |
@@ -268,9 +268,11 @@ npm install
 ### 交互方式
 
 - 左键拖拽：移动桌宠
-- 单击：按当前 `clickAction` 打开主聊天动作，默认是 Gateway Chat，也可以切到 CLI TUI
-- 双击：打开控制面板
-- 托盘菜单：显示或隐藏桌宠、切换单击动作、打开聊天、打开控制面板、退出
+- 左键单击桌宠：打开控制面板
+- 左键拖拽：移动桌宠
+- 桌宠双击：当前没有单独的双击动作
+- 托盘菜单：显示桌宠、管理连接、切换默认主聊天动作、打开当前主动作、打开 Gateway Chat、打开 CLI TUI、打开控制面板、退出
+- 托盘图标双击：显示或隐藏桌宠
 
 ### 窗口与入口
 
@@ -398,7 +400,7 @@ The current repository mainly focuses on:
 - moving the Gateway connection into the Electron main process to reduce renderer-side networking issues
 - automatically resolving the Gateway URL, Control UI URL, shared token, and password
 - treating a stopped OpenClaw instance as a resting or offline pet instead of a crashed app
-- supporting single-click primary chat action, double-click dashboard open, and drag-to-move interaction
+- supporting click-to-open dashboard behavior, drag-to-move interaction, and tray-based chat entrypoints
 - using stable English debug labels to reduce garbled terminal output
 - keeping enough logging to verify whether upstream actually triggered tool calls
 
@@ -531,7 +533,7 @@ Common extension config fields:
 | `gatewayPasswordFile` | Load password from file | `""` |
 | `controlUiBaseUrl` | Manually set Control UI base URL | `""` |
 | `mainSessionKey` | Main session key | `"main"` |
-| `clickAction` | Opens `gateway-chat` or `cli-tui` on single click; this can also be changed from the tray menu | `"gateway-chat"` |
+| `clickAction` | Selects the default primary chat action as `gateway-chat` or `cli-tui` for tray quick-open entries; this can also be changed from the tray menu | `"gateway-chat"` |
 | `cliCommand` | Custom CLI TUI command template | `""` |
 | `petCorner` | Default screen corner | `"bottom-right"` |
 | `petSize` | Pet size | `240` |
@@ -642,10 +644,11 @@ This layer is useful for more granular animation design. For example:
 
 ### Interaction Model
 
+- left-button click on the pet: open the dashboard
 - left-button drag: move the pet
-- single click: open the current `clickAction`; default is Gateway Chat, but it can be switched to CLI TUI
-- double click: open the dashboard
-- tray menu: show or hide the pet, switch the single-click action, open chat, open the dashboard, quit
+- pet double-click: currently has no separate dedicated action
+- tray menu: show the pet, manage connection, switch the default primary chat action, open the current primary action, open Gateway Chat, open CLI TUI, open the dashboard, quit
+- tray icon double-click: show or hide the pet
 
 ### Windows and Entrypoints
 
