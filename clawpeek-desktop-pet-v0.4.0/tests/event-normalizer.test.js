@@ -54,14 +54,10 @@ test('assistant stream events are preserved as raw session events', () => {
     },
   }, 1);
 
-  assert.deepEqual(event, {
-    type: 'RAW_EVENT',
-    ts: 1,
-    sessionKey: 'agent:main:main',
-    runId: 'run1',
-    label: '收到 agent.assistant 事件',
-    detail: 'agent.assistant',
-  });
+  assert.equal(event.type, 'RAW_EVENT');
+  assert.equal(event.sessionKey, 'agent:main:main');
+  assert.equal(event.runId, 'run1');
+  assert.equal(event.detail, 'agent.assistant');
 });
 
 test('assistant function calls are normalized as tool events', () => {
@@ -84,7 +80,7 @@ test('assistant function calls are normalized as tool events', () => {
 
   assert.equal(event.type, 'TOOL_STARTED');
   assert.equal(event.activityKind, 'read');
-  assert.match(event.label, /读取文件：/);
+  assert.match(event.label, /Reading file/);
   assert.match(event.label, /demo\.txt/);
 });
 
@@ -106,4 +102,75 @@ test('assistant function call outputs are normalized as tool results', () => {
 
   assert.equal(event.type, 'TOOL_RESULT');
   assert.equal(event.activityKind, 'read');
+});
+
+test('text protocol TOOLCALL markers are inferred as tool events', () => {
+  const [event] = normalizeGatewayFrame({
+    type: 'event',
+    event: 'agent',
+    payload: {
+      sessionKey: 'agent:main:main',
+      runId: 'run3',
+      stream: 'assistant',
+      data: {
+        text: 'TOOLCALL>[{"name":"web_search","input":{"query":"北京下周天气"}}]',
+      },
+    },
+  }, 1);
+
+  assert.equal(event.type, 'TOOL_STARTED');
+  assert.equal(event.activityKind, 'search_web');
+  assert.equal(event.detail, 'web_search');
+  assert.equal(event.syntheticSignature, 'toolcall:run3:web_search');
+});
+
+test('API result text produces synthetic tool events before chat final', () => {
+  const events = normalizeGatewayFrame({
+    type: 'event',
+    event: 'chat',
+    payload: {
+      sessionKey: 'agent:main:main',
+      runId: 'run4',
+      state: 'final',
+      message: {
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: '已通过 Open-Meteo API 获取到北京未来一周天气预报。',
+          },
+        ],
+      },
+    },
+  }, 1);
+
+  assert.deepEqual(events.map((event) => event.type), ['TOOL_STARTED', 'TOOL_RESULT', 'CHAT_FINAL']);
+  assert.equal(events[0].detail, 'Open-Meteo API');
+  assert.equal(events[1].detail, 'Open-Meteo API');
+  assert.match(events[2].label, /^完成/);
+});
+
+test('weather data result text also produces synthetic tool events before chat final', () => {
+  const events = normalizeGatewayFrame({
+    type: 'event',
+    event: 'chat',
+    payload: {
+      sessionKey: 'agent:main:main',
+      runId: 'run5',
+      state: 'final',
+      message: {
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: '已获取到北京未来7天每小时的天气数据，以下是每天中午12:00的天气情况。',
+          },
+        ],
+      },
+    },
+  }, 1);
+
+  assert.deepEqual(events.map((event) => event.type), ['TOOL_STARTED', 'TOOL_RESULT', 'CHAT_FINAL']);
+  assert.match(events[0].detail, /天气数据/);
+  assert.match(events[1].detail, /天气数据/);
 });

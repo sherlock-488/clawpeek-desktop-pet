@@ -224,6 +224,60 @@ function summarizeEvent(event = {}) {
   };
 }
 
+export function dedupeSyntheticEvents(events = [], memory = new Set()) {
+  const filtered = [];
+
+  for (const event of events) {
+    const key = typeof event?.syntheticSignature === 'string' ? event.syntheticSignature : '';
+    if (!key) {
+      filtered.push(event);
+      continue;
+    }
+
+    if (memory.has(key)) {
+      continue;
+    }
+
+    memory.add(key);
+    filtered.push(event);
+
+    while (memory.size > 512) {
+      const oldest = memory.values().next().value;
+      if (!oldest) break;
+      memory.delete(oldest);
+    }
+  }
+
+  return filtered;
+}
+
+export function cleanupSyntheticEventMemory(memory = new Set(), events = []) {
+  if (!memory.size) return;
+
+  for (const event of events) {
+    if (event.type === 'SYSTEM_DISCONNECTED' || event.type === 'SYSTEM_ERROR') {
+      memory.clear();
+      return;
+    }
+
+    if (!['CHAT_FINAL', 'RUN_ERROR'].includes(event.type)) {
+      continue;
+    }
+
+    const scope = String(event.runId || event.sessionKey || '').trim();
+    if (!scope) {
+      continue;
+    }
+
+    const needle = `:${scope}:`;
+    for (const key of [...memory]) {
+      if (key.includes(needle)) {
+        memory.delete(key);
+      }
+    }
+  }
+}
+
 function shouldLogFrame(frame = {}, normalizedEvents = []) {
   if (normalizedEvents.some((event) => ['TOOL_STARTED', 'TOOL_RESULT', 'APPROVAL_REQUESTED'].includes(event.type))) {
     return true;
@@ -284,6 +338,7 @@ export class MainProcessGatewayClient extends BaseClient {
     this.settings = settings;
     this.unsubscribeStatus = null;
     this.unsubscribeFrame = null;
+    this.syntheticEventKeys = new Set();
   }
 
   async connect() {
@@ -299,7 +354,10 @@ export class MainProcessGatewayClient extends BaseClient {
 
     if (!this.unsubscribeFrame) {
       this.unsubscribeFrame = window.desktopPetAPI.onGatewayFrame((frame) => {
-        const normalizedEvents = normalizeGatewayFrame(frame, Date.now());
+        const normalizedEvents = dedupeSyntheticEvents(
+          normalizeGatewayFrame(frame, Date.now()),
+          this.syntheticEventKeys,
+        );
 
         if (shouldLogFrame(frame, normalizedEvents)) {
           emitDebugLog('gateway-client', {
@@ -311,6 +369,8 @@ export class MainProcessGatewayClient extends BaseClient {
         for (const event of normalizedEvents) {
           this.emitEvent(event);
         }
+
+        cleanupSyntheticEventMemory(this.syntheticEventKeys, normalizedEvents);
       });
     }
 
@@ -324,6 +384,7 @@ export class MainProcessGatewayClient extends BaseClient {
     this.unsubscribeStatus = null;
     this.unsubscribeFrame?.();
     this.unsubscribeFrame = null;
+    this.syntheticEventKeys.clear();
     await window.desktopPetAPI.stopGatewayBridge();
   }
 }

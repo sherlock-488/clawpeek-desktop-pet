@@ -61,35 +61,37 @@ function classifyExecCommand(command) {
   return ACTIVITY.EXEC;
 }
 
-function kindLabel(activityKind) {
+function activityVerb(activityKind) {
   switch (activityKind) {
     case ACTIVITY.LIST:
-      return '查看路径';
+      return 'Listing files';
     case ACTIVITY.READ:
-      return '读取文件';
+      return 'Reading file';
     case ACTIVITY.SEARCH_CODE:
-      return '搜索项目';
+      return 'Searching code';
     case ACTIVITY.SEARCH_WEB:
-      return '联网搜索';
+      return 'Searching web';
     case ACTIVITY.BROWSE:
-      return '浏览网页';
+      return 'Browsing page';
     case ACTIVITY.EXEC:
-      return '执行命令';
+      return 'Running command';
     case ACTIVITY.EDIT:
-      return '修改文件';
+      return 'Editing file';
     case ACTIVITY.WRITE:
-      return '写入文件';
+      return 'Writing file';
     case ACTIVITY.ATTACH:
-      return '附加内容';
+      return 'Attaching content';
     case ACTIVITY.TOOL:
-      return '调用工具';
+      return 'Using tool';
     default:
-      return '处理中';
+      return 'Processing task';
   }
 }
 
 function buildLabel(activityKind, subject) {
-  return `${kindLabel(activityKind)}：${truncate(subject || kindLabel(activityKind), 64)}`;
+  const verb = activityVerb(activityKind);
+  const trimmedSubject = truncate(subject || '', 64);
+  return trimmedSubject ? `${verb}: ${trimmedSubject}` : verb;
 }
 
 export function classifyTool(toolName, rawArgs = {}, meta = {}) {
@@ -225,15 +227,15 @@ export function glyphForActivity(activityKind) {
     case ACTIVITY.LIST:
       return '🗂️';
     case ACTIVITY.READ:
-      return '📄';
+      return '📖';
     case ACTIVITY.SEARCH_CODE:
       return '🔎';
     case ACTIVITY.SEARCH_WEB:
-      return '🌍';
-    case ACTIVITY.BROWSE:
       return '🌐';
+    case ACTIVITY.BROWSE:
+      return '🧭';
     case ACTIVITY.EXEC:
-      return '⌨️';
+      return '⚙️';
     case ACTIVITY.WRITE:
       return '✍️';
     case ACTIVITY.EDIT:

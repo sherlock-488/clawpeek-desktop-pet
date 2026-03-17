@@ -19,8 +19,6 @@ function phaseLabel(phase = '') {
       return 'Queued';
     case 'thinking':
       return 'Processing task';
-    case 'tool':
-      return 'Using tool';
     case 'waiting':
       return 'Waiting for approval';
     case 'done':
@@ -61,11 +59,12 @@ function activityLabel(activity = '') {
 
 export function debugLabelForState(derived = {}) {
   const phase = String(derived?.phase || 'idle');
+  const rawLabel = readableText(derived?.label);
+
   if (phase === 'tool') {
     return activityLabel(derived?.activityKind);
   }
 
-  const rawLabel = readableText(derived?.label);
   if (rawLabel && rawLabel !== '[object Object]') {
     return rawLabel;
   }

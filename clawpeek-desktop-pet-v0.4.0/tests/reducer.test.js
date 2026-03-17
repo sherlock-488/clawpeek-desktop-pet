@@ -13,37 +13,37 @@ test('initial state is resting until Gateway handshake succeeds', () => {
 
   assert.equal(state.connection, 'disconnected');
   assert.equal(state.derived.phase, PHASE.OFFLINE);
-  assert.equal(state.derived.label, '休息中');
-  assert.equal(state.derived.connectionText, '休息中');
+  assert.equal(state.derived.label, 'Resting');
+  assert.equal(state.derived.connectionText, 'Resting');
 });
 
 test('SYSTEM_CONNECTED promotes resting state into idle', () => {
   const state = run([
-    { type: 'SYSTEM_CONNECTED', ts: 1, label: '握手完成' },
+    { type: 'SYSTEM_CONNECTED', ts: 1, label: 'Handshake complete' },
   ]);
 
   assert.equal(state.connection, 'connected');
   assert.equal(state.derived.phase, PHASE.IDLE);
-  assert.equal(state.derived.label, '空闲中');
+  assert.equal(state.derived.label, 'Idle');
 });
 
 test('SYSTEM_DISCONNECTED sends an active pet back to resting mode', () => {
   const state = run([
-    { type: 'SYSTEM_CONNECTED', ts: 1, label: '握手完成' },
-    { type: 'RUN_STARTED', sessionKey: 'main', runId: 'run1', ts: 2, label: '处理中' },
-    { type: 'SYSTEM_DISCONNECTED', ts: 3, label: 'OpenClaw 已关闭，龙虾休息中', detail: 'shutdown' },
+    { type: 'SYSTEM_CONNECTED', ts: 1, label: 'Handshake complete' },
+    { type: 'RUN_STARTED', sessionKey: 'main', runId: 'run1', ts: 2, label: 'start' },
+    { type: 'SYSTEM_DISCONNECTED', ts: 3, label: 'Connection paused', detail: 'shutdown' },
   ]);
 
   assert.equal(state.connection, 'disconnected');
   assert.equal(state.derived.phase, PHASE.OFFLINE);
-  assert.equal(state.derived.label, '休息中');
-  assert.equal(state.derived.connectionText, '休息中');
+  assert.equal(state.derived.label, 'Resting');
+  assert.equal(state.derived.connectionText, 'Resting');
 });
 
 test('main session keeps priority when active', () => {
   const state = run([
     { type: 'RUN_STARTED', sessionKey: 'research', runId: 'a', ts: 1, label: 'research task' },
-    { type: 'TOOL_STARTED', sessionKey: 'research', runId: 'a', ts: 2, activityKind: 'browse', label: 'browse docs' },
+    { type: 'TOOL_STARTED', sessionKey: 'research', runId: 'a', ts: 2, activityKind: 'browse', label: 'Browsing page: docs' },
     { type: 'RUN_STARTED', sessionKey: 'main', runId: 'b', ts: 3, label: 'main task' },
     { type: 'JOB_STATE', sessionKey: 'main', runId: 'b', ts: 4, state: 'streaming', label: 'main thinking' },
   ]);
@@ -55,28 +55,29 @@ test('main session keeps priority when active', () => {
 test('waiting state is triggered by approval requests', () => {
   const state = run([
     { type: 'RUN_STARTED', sessionKey: 'main', runId: 'run1', ts: 1, label: 'start' },
-    { type: 'APPROVAL_REQUESTED', sessionKey: 'main', runId: 'run1', ts: 2, label: '等待授权：pnpm test' },
+    { type: 'APPROVAL_REQUESTED', sessionKey: 'main', runId: 'run1', ts: 2, label: 'Waiting for approval: npm test' },
   ]);
 
   assert.equal(state.derived.phase, PHASE.WAITING);
-  assert.match(state.derived.label, /等待授权/);
+  assert.match(state.derived.label, /Waiting for approval/);
 });
 
-test('tool state remains active until a new event arrives', () => {
+test('tool events keep the pet in thinking while preserving activity', () => {
   const state = run([
     { type: 'RUN_STARTED', sessionKey: 'main', runId: 'run1', ts: 1, label: 'start' },
-    { type: 'TOOL_STARTED', sessionKey: 'main', runId: 'run1', ts: 2, activityKind: 'exec', label: '执行命令：pnpm test' },
+    { type: 'TOOL_STARTED', sessionKey: 'main', runId: 'run1', ts: 2, activityKind: 'exec', label: 'Running command: npm test' },
     { type: 'TICK', ts: 15_000 },
   ]);
 
-  assert.equal(state.derived.phase, PHASE.TOOL);
+  assert.equal(state.derived.phase, PHASE.THINKING);
+  assert.equal(state.derived.activityKind, 'exec');
   assert.equal(state.derived.confidence, 'confirmed');
 });
 
 test('done returns to idle after ttl', () => {
   const state = run([
     { type: 'RUN_STARTED', sessionKey: 'main', runId: 'run1', ts: 1, label: 'start' },
-    { type: 'CHAT_FINAL', sessionKey: 'main', runId: 'run1', ts: 2, label: '完成：搞定了' },
+    { type: 'CHAT_FINAL', sessionKey: 'main', runId: 'run1', ts: 2, label: 'Completed: fixed it' },
     { type: 'TICK', ts: 5_000 },
   ]);
 
@@ -90,13 +91,13 @@ test('raw agent events move the display session into an inferred active state', 
       sessionKey: 'agent:main:main',
       runId: 'run1',
       ts: 1,
-      label: '收到 agent.assistant 事件',
+      label: 'Received agent.assistant event',
       detail: 'agent.assistant',
     },
   ]);
 
   assert.equal(state.derived.sessionKey, 'agent:main:main');
   assert.equal(state.derived.phase, PHASE.THINKING);
-  assert.equal(state.derived.label, '正在处理任务');
+  assert.equal(state.derived.label, 'Processing task');
   assert.equal(state.derived.confidence, 'inferred');
 });

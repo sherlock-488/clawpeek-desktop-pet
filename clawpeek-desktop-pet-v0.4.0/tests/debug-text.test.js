@@ -5,24 +5,24 @@ import { debugLabelForEvent, debugLabelForState } from '../src/core/debug-text.j
 
 test('debugLabelForEvent returns stable english labels for raw events and chat final', () => {
   assert.equal(
-    debugLabelForEvent({ type: 'RAW_EVENT', detail: 'agent.assistant', label: '鏀跺埌 agent.assistant 浜嬩欢' }),
+    debugLabelForEvent({ type: 'RAW_EVENT', detail: 'agent.assistant', label: '乱码标签' }),
     'Received agent.assistant event',
   );
 
   assert.equal(
-    debugLabelForEvent({ type: 'CHAT_FINAL', label: '瀹屾垚锛歔object Object]' }),
+    debugLabelForEvent({ type: 'CHAT_FINAL', label: '乱码 [object Object]' }),
     'Completed',
   );
 });
 
-test('debugLabelForState replaces garbled internal labels with english phase labels', () => {
+test('debugLabelForState replaces unreadable labels with phase labels', () => {
   assert.equal(
-    debugLabelForState({ phase: 'idle', label: '绌洪棽涓?' }),
+    debugLabelForState({ phase: 'idle', label: '乱码' }),
     'Idle',
   );
 
   assert.equal(
-    debugLabelForState({ phase: 'tool', activityKind: 'search_web', label: '鑱旂綉鎼滅储锛歨efei weather' }),
-    'Searching web',
+    debugLabelForState({ phase: 'thinking', activityKind: 'search_web', label: '乱码' }),
+    'Processing task',
   );
 });

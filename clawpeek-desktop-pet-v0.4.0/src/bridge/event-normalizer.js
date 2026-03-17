@@ -58,6 +58,222 @@ function parseArgsLike(value) {
   }
 }
 
+function uniqueTextValues(values = []) {
+  const seen = new Set();
+  const ordered = [];
+
+  for (const value of values) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    ordered.push(text);
+  }
+
+  return ordered.sort((left, right) => right.length - left.length);
+}
+
+function extractTextCandidates(payload = {}, data = {}) {
+  const candidates = [];
+  const push = (value) => {
+    if (typeof value === 'string' && value.trim()) {
+      candidates.push(value);
+    }
+  };
+
+  push(data?.text);
+  push(data?.delta);
+  push(payload?.text);
+  push(payload?.preview);
+
+  if (typeof payload?.message === 'string') {
+    push(payload.message);
+  }
+
+  if (payload?.message && typeof payload.message === 'object') {
+    push(payload.message.text);
+
+    if (Array.isArray(payload.message.content)) {
+      for (const part of payload.message.content) {
+        if (part?.type === 'text') {
+          push(part.text);
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(data?.content)) {
+    for (const part of data.content) {
+      if (part?.type === 'text') {
+        push(part.text);
+      }
+    }
+  }
+
+  return uniqueTextValues(candidates);
+}
+
+function extractToolNameFromJsonish(text = '') {
+  const match = String(text).match(/"name"\s*:\s*"([^"]+)"/i);
+  return match?.[1] || '';
+}
+
+function extractJsonishValue(text = '', key) {
+  const match = String(text).match(new RegExp(`"${key}"\\s*:\\s*"([^"]+)"`, 'i'));
+  return match?.[1] || '';
+}
+
+function tryParseToolCallPayload(text = '') {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function classifySyntheticTool(detail, toolName = '', args = {}) {
+  if (toolName) {
+    return classifyTool(toolName, args);
+  }
+
+  const normalizedDetail = lower(detail);
+  if (
+    normalizedDetail.includes('open-meteo')
+    || normalizedDetail.includes('weather')
+    || normalizedDetail.includes('search')
+    || normalizedDetail.includes('meteo')
+  ) {
+    return classifyTool('web_search', { query: detail });
+  }
+
+  return classifyTool(detail || 'tool', args);
+}
+
+function buildSyntheticToolEvent(type, sessionKey, runId, detail, classified, syntheticSignature) {
+  return {
+    type,
+    sessionKey,
+    runId,
+    activityKind: classified.activityKind,
+    label: classified.label,
+    detail,
+    syntheticSignature,
+  };
+}
+
+function extractWeatherDataDetail(text = '') {
+  const match = String(text).match(/已获取到([^。；\n]{0,80}?(?:天气数据|天气预报|逐小时天气))/i);
+  return match?.[1]?.trim() || '天气数据';
+}
+
+function inferTextToolEvents(payload = {}, data = {}, sessionKey, runId) {
+  const texts = extractTextCandidates(payload, data);
+  if (!texts.length) return [];
+
+  for (const text of texts) {
+    const toolCallMarker = text.match(/TOOLCALL>\s*([\s\S]+)/i);
+    if (toolCallMarker) {
+      const parsed = tryParseToolCallPayload(toolCallMarker[1]);
+      const entry = Array.isArray(parsed) ? parsed[0] : parsed;
+      const toolName = entry?.name || extractToolNameFromJsonish(toolCallMarker[1]);
+      if (toolName) {
+        const args = parseArgsLike(entry?.input || entry?.arguments || entry?.args || {
+          query: extractJsonishValue(toolCallMarker[1], 'query'),
+          q: extractJsonishValue(toolCallMarker[1], 'q'),
+          url: extractJsonishValue(toolCallMarker[1], 'url'),
+          path: extractJsonishValue(toolCallMarker[1], 'path'),
+          command: extractJsonishValue(toolCallMarker[1], 'command'),
+        });
+        const classified = classifySyntheticTool(toolName, toolName, args);
+
+        return [
+          buildSyntheticToolEvent(
+            'TOOL_STARTED',
+            sessionKey,
+            runId,
+            toolName,
+            classified,
+            `toolcall:${runId || sessionKey}:${toolName}`,
+          ),
+        ];
+      }
+    }
+
+    const successfulToolMatch = text.match(/(?:成功调用工具|已调用工具|successfully called tool|called tool)\s*[:：]\s*([A-Za-z0-9_.-]+)/i);
+    if (successfulToolMatch) {
+      const toolName = successfulToolMatch[1];
+      const classified = classifySyntheticTool(toolName, toolName);
+
+      return [
+        buildSyntheticToolEvent(
+          'TOOL_STARTED',
+          sessionKey,
+          runId,
+          toolName,
+          classified,
+          `tool-success:${runId || sessionKey}:${toolName}`,
+        ),
+      ];
+    }
+
+    const apiResultMatch = text.match(/(?:已通过|通过)\s+([A-Za-z0-9][A-Za-z0-9 ._-]{1,64}?API)\s*(?:获取到|查询到|拿到)/i)
+      || text.match(/(?:retrieved|fetched|obtained)\s+(?:data|results)?\s*(?:via|through|from)\s+([A-Za-z0-9][A-Za-z0-9 ._-]{1,64}?API)/i);
+    if (apiResultMatch) {
+      const apiName = apiResultMatch[1].trim();
+      const classified = classifySyntheticTool(apiName);
+
+      return [
+        buildSyntheticToolEvent(
+          'TOOL_STARTED',
+          sessionKey,
+          runId,
+          apiName,
+          classified,
+          `api-tool-start:${runId || sessionKey}:${lower(apiName)}`,
+        ),
+        buildSyntheticToolEvent(
+          'TOOL_RESULT',
+          sessionKey,
+          runId,
+          apiName,
+          classified,
+          `api-tool-result:${runId || sessionKey}:${lower(apiName)}`,
+        ),
+      ];
+    }
+
+    const looksLikeWeatherData = /已获取到[^。；\n]{0,120}?(?:天气数据|天气预报|逐小时天气)/i.test(text)
+      || /(?:retrieved|fetched|obtained)[^.\n]{0,120}?(?:weather data|weather forecast|hourly weather)/i.test(text);
+    if (looksLikeWeatherData) {
+      const detail = extractWeatherDataDetail(text);
+      const classified = classifyTool('weather_api', { query: detail });
+
+      return [
+        buildSyntheticToolEvent(
+          'TOOL_STARTED',
+          sessionKey,
+          runId,
+          detail,
+          classified,
+          `weather-data-start:${runId || sessionKey}:${lower(detail)}`,
+        ),
+        buildSyntheticToolEvent(
+          'TOOL_RESULT',
+          sessionKey,
+          runId,
+          detail,
+          classified,
+          `weather-data-result:${runId || sessionKey}:${lower(detail)}`,
+        ),
+      ];
+    }
+  }
+
+  return [];
+}
+
 function extractToolEvent(payload, data, stream) {
   const typeHint = lower(data?.type || data?.kind || data?.event || payload?.type || payload?.kind || stream);
   const toolName = data?.name
@@ -140,6 +356,7 @@ function normalizeAgentEvent(frame, ts) {
   const stream = payload.stream || payload.kind || pick(payload, ['data', 'stream']);
   const data = payload.data || payload;
   const toolEvent = extractToolEvent(payload, data, stream);
+  const inferredToolEvents = inferTextToolEvents(payload, data, sessionKey, runId);
 
   if (stream === 'job') {
     const state = data.state || payload.state || 'started';
@@ -172,6 +389,13 @@ function normalizeAgentEvent(frame, ts) {
     }];
   }
 
+  if (inferredToolEvents.length) {
+    return inferredToolEvents.map((event) => ({
+      ...event,
+      ts,
+    }));
+  }
+
   return [{
     type: 'RAW_EVENT',
     ts,
@@ -187,20 +411,28 @@ function normalizeChatEvent(frame, ts) {
   const sessionKey = payload.sessionKey || payload.session || 'main';
   const runId = payload.runId || payload.id || null;
   const state = payload.state || payload.kind || payload.type || '';
+  const inferredToolEvents = inferTextToolEvents(payload, payload.message || payload, sessionKey, runId)
+    .map((event) => ({
+      ...event,
+      ts,
+    }));
 
   if (['final', 'done', 'complete', 'completed'].includes(String(state).toLowerCase())) {
-    const text = payload.text || payload.message || payload.preview || '已完成';
-    return [{
-      type: 'CHAT_FINAL',
-      ts,
-      sessionKey,
-      runId,
-      label: `完成：${truncate(text, 80)}`,
-      detail: 'chat.final',
-    }];
+    const text = extractTextCandidates(payload, payload.message || payload)[0] || payload.text || payload.preview || '已完成';
+    return [
+      ...inferredToolEvents,
+      {
+        type: 'CHAT_FINAL',
+        ts,
+        sessionKey,
+        runId,
+        label: `完成：${truncate(text, 80)}`,
+        detail: 'chat.final',
+      },
+    ];
   }
 
-  return [];
+  return inferredToolEvents;
 }
 
 function normalizeApprovalEvent(frame, ts) {

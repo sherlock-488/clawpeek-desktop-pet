@@ -8,7 +8,7 @@ function baseSession(sessionKey, mainSessionKey, ts = nowTs()) {
     runId: null,
     phase: PHASE.IDLE,
     activityKind: ACTIVITY.NONE,
-    label: '空闲中',
+    label: 'Idle',
     confidence: CONFIDENCE.UNKNOWN,
     updatedAt: ts,
     startedAt: null,
@@ -45,6 +45,7 @@ function logEvent(state, event) {
     label: event.label ?? event.type,
     detail: event.detail ?? '',
   };
+
   return {
     ...state,
     recentEvents: [entry, ...state.recentEvents].slice(0, THRESHOLDS.eventLogLimit),
@@ -67,7 +68,7 @@ function sessionDone(session, event) {
   return {
     ...session,
     phase: PHASE.DONE,
-    label: event.label || '已完成',
+    label: event.label || 'Completed',
     confidence: CONFIDENCE.CONFIRMED,
     updatedAt: event.ts,
     lastProgressAt: event.ts,
@@ -82,7 +83,7 @@ function sessionIdle(session, ts) {
     runId: null,
     phase: PHASE.IDLE,
     activityKind: ACTIVITY.NONE,
-    label: '空闲中',
+    label: 'Idle',
     confidence: CONFIDENCE.UNKNOWN,
     updatedAt: ts,
     startedAt: null,
@@ -92,14 +93,19 @@ function sessionIdle(session, ts) {
   };
 }
 
-function sessionOffline(session, ts, label = '休息中') {
+function sessionOffline(session, ts, label = 'Resting') {
   return {
     ...session,
+    runId: null,
     phase: PHASE.OFFLINE,
+    activityKind: ACTIVITY.NONE,
     label,
     confidence: CONFIDENCE.UNKNOWN,
     updatedAt: ts,
+    startedAt: null,
+    lastProgressAt: ts,
     waitingReason: null,
+    error: null,
   };
 }
 
@@ -107,15 +113,11 @@ function inferRawEventPhase(event, session) {
   const detail = String(event.detail || '').toLowerCase();
   const label = String(event.label || '').toLowerCase();
 
-  if (detail.includes('approval') || label.includes('授权')) {
+  if (detail.includes('approval') || label.includes('approval')) {
     return PHASE.WAITING;
   }
 
-  if (detail.includes('tool') || label.includes('tool')) {
-    return PHASE.TOOL;
-  }
-
-  if (session.phase !== PHASE.IDLE && session.phase !== PHASE.OFFLINE) {
+  if ([PHASE.QUEUED, PHASE.THINKING, PHASE.WAITING].includes(session.phase)) {
     return session.phase;
   }
 
@@ -125,34 +127,51 @@ function inferRawEventPhase(event, session) {
 function inferRawEventLabel(event, phase) {
   switch (phase) {
     case PHASE.WAITING:
-      return '等待你的授权';
-    case PHASE.TOOL:
-      return '正在调用工具';
+      return 'Waiting for approval';
+    case PHASE.QUEUED:
+      return 'Queued';
     case PHASE.THINKING:
-      return '正在处理任务';
+      return 'Processing task';
     default:
-      return event.label || '收到新的会话事件';
+      return event.label || 'Received new session event';
   }
+}
+
+function isDisplayActivePhase(phase) {
+  return ![PHASE.IDLE, PHASE.OFFLINE].includes(phase);
 }
 
 function displaySessionKey(state) {
   const mainKey = state.settings.mainSessionKey;
   const main = state.sessions[mainKey];
 
-  if (main && ![PHASE.IDLE, PHASE.OFFLINE].includes(main.phase)) {
+  if (main && isDisplayActivePhase(main.phase)) {
     return mainKey;
   }
 
   const remembered = state.ui.lastActiveSessionKey;
-  if (remembered && state.sessions[remembered] && state.sessions[remembered].phase !== PHASE.IDLE) {
+  if (remembered && state.sessions[remembered] && isDisplayActivePhase(state.sessions[remembered].phase)) {
     return remembered;
   }
 
   const mostRecent = Object.values(state.sessions)
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .find((session) => session.phase !== PHASE.IDLE);
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .find((session) => isDisplayActivePhase(session.phase));
 
   return mostRecent?.sessionKey ?? mainKey;
+}
+
+function connectionText(connection) {
+  switch (connection) {
+    case CONNECTION.CONNECTING:
+      return 'Connecting';
+    case CONNECTION.CONNECTED:
+      return 'Connected';
+    case CONNECTION.ERROR:
+      return 'Connection failed';
+    default:
+      return 'Resting';
+  }
 }
 
 function computeDerivedState(state, ts = nowTs()) {
@@ -190,16 +209,35 @@ function computeDerivedState(state, ts = nowTs()) {
   };
 }
 
-function connectionText(connection) {
-  switch (connection) {
-    case CONNECTION.CONNECTING:
-      return '连接中';
-    case CONNECTION.CONNECTED:
-      return '已连接';
-    case CONNECTION.ERROR:
-      return '连接失败';
+function phaseForJobState(state) {
+  switch (String(state || '').toLowerCase()) {
+    case 'done':
+      return PHASE.DONE;
+    case 'error':
+      return PHASE.ERROR;
+    case 'queued':
+    case 'pending':
+    case 'started':
+      return PHASE.QUEUED;
     default:
-      return '休息中';
+      return PHASE.THINKING;
+  }
+}
+
+function labelForJobState(state) {
+  switch (String(state || '').toLowerCase()) {
+    case 'streaming':
+      return 'Processing task';
+    case 'queued':
+    case 'pending':
+    case 'started':
+      return 'Queued';
+    case 'done':
+      return 'Completed';
+    case 'error':
+      return 'Run failed';
+    default:
+      return 'Processing task';
   }
 }
 
@@ -210,7 +248,10 @@ export function createInitialState(overrides = {}) {
   };
 
   const initialTs = nowTs();
-  const restingMainSession = sessionOffline(baseSession(settings.mainSessionKey, settings.mainSessionKey, initialTs), initialTs);
+  const restingMainSession = sessionOffline(
+    baseSession(settings.mainSessionKey, settings.mainSessionKey, initialTs),
+    initialTs,
+  );
 
   const seed = {
     connection: CONNECTION.DISCONNECTED,
@@ -252,7 +293,7 @@ export function reducer(state, event) {
           Object.entries(state.sessions).map(([key, session]) => [
             key,
             session.phase === PHASE.OFFLINE ? sessionIdle(session, ts) : session,
-          ])
+          ]),
         ),
       };
       break;
@@ -266,7 +307,7 @@ export function reducer(state, event) {
           Object.entries(state.sessions).map(([key, session]) => [
             key,
             sessionOffline(session, ts),
-          ])
+          ]),
         ),
       };
       break;
@@ -275,12 +316,12 @@ export function reducer(state, event) {
       next = {
         ...state,
         connection: CONNECTION.ERROR,
-        connectionError: event.detail ?? event.label ?? '未知错误',
+        connectionError: event.detail ?? event.label ?? 'Unknown error',
         sessions: Object.fromEntries(
           Object.entries(state.sessions).map(([key, session]) => [
             key,
             sessionOffline(session, ts),
-          ])
+          ]),
         ),
       };
       break;
@@ -348,7 +389,7 @@ export function reducer(state, event) {
         runId: event.runId ?? session.runId,
         phase: PHASE.QUEUED,
         activityKind: ACTIVITY.NONE,
-        label: event.label || '已接收任务',
+        label: event.label || 'Queued',
         confidence: CONFIDENCE.CONFIRMED,
         updatedAt: ts,
         startedAt: session.startedAt ?? ts,
@@ -361,33 +402,18 @@ export function reducer(state, event) {
 
     case 'JOB_STATE':
       next = withSession(state, event.sessionKey, (session) => {
-        const phase = event.state === 'done'
-          ? PHASE.DONE
-          : event.state === 'error'
-            ? PHASE.ERROR
-            : PHASE.THINKING;
-
-        const label = event.label || (
-          event.state === 'streaming'
-            ? '正在思考'
-            : event.state === 'started'
-              ? '开始处理任务'
-              : event.state === 'done'
-                ? '已完成'
-                : '运行出错'
-        );
-
+        const phase = phaseForJobState(event.state);
         return {
           ...session,
           runId: event.runId ?? session.runId,
           phase,
-          activityKind: phase === PHASE.THINKING ? ACTIVITY.NONE : session.activityKind,
-          label,
+          activityKind: phase === PHASE.THINKING ? session.activityKind : ACTIVITY.NONE,
+          label: event.label || labelForJobState(event.state),
           confidence: CONFIDENCE.CONFIRMED,
           updatedAt: ts,
           startedAt: session.startedAt ?? ts,
           lastProgressAt: ts,
-          error: phase === PHASE.ERROR ? label : null,
+          error: phase === PHASE.ERROR ? (event.detail ?? event.label ?? 'Run failed') : null,
         };
       }, ts);
       next = markActiveSession(next, event.sessionKey, ts);
@@ -397,9 +423,9 @@ export function reducer(state, event) {
       next = withSession(state, event.sessionKey, (session) => ({
         ...session,
         runId: event.runId ?? session.runId,
-        phase: PHASE.TOOL,
+        phase: PHASE.THINKING,
         activityKind: event.activityKind ?? ACTIVITY.TOOL,
-        label: event.label || '正在调用工具',
+        label: event.label || 'Using tool',
         confidence: CONFIDENCE.CONFIRMED,
         updatedAt: ts,
         startedAt: session.startedAt ?? ts,
@@ -416,7 +442,7 @@ export function reducer(state, event) {
         runId: event.runId ?? session.runId,
         phase: PHASE.THINKING,
         activityKind: event.activityKind ?? session.activityKind,
-        label: event.label || '工具已返回，继续处理中',
+        label: event.label || 'Tool returned, continuing',
         confidence: CONFIDENCE.CONFIRMED,
         updatedAt: ts,
         lastProgressAt: ts,
@@ -430,7 +456,7 @@ export function reducer(state, event) {
         runId: event.runId ?? session.runId,
         phase: PHASE.WAITING,
         activityKind: session.activityKind,
-        label: event.label || '等待你的授权',
+        label: event.label || 'Waiting for approval',
         confidence: CONFIDENCE.CONFIRMED,
         updatedAt: ts,
         lastProgressAt: ts,
@@ -449,7 +475,7 @@ export function reducer(state, event) {
         ...session,
         runId: event.runId ?? session.runId,
         phase: PHASE.ERROR,
-        label: event.label || '出错了',
+        label: event.label || 'Run failed',
         confidence: CONFIDENCE.CONFIRMED,
         updatedAt: ts,
         lastProgressAt: ts,
@@ -471,7 +497,7 @@ export function reducer(state, event) {
           ...session,
           runId: event.runId ?? session.runId,
           phase,
-          activityKind: phase === PHASE.TOOL ? ACTIVITY.TOOL : session.activityKind,
+          activityKind: session.activityKind,
           label: inferRawEventLabel(event, phase),
           confidence: CONFIDENCE.INFERRED,
           updatedAt: ts,

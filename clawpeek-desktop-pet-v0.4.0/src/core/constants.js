@@ -10,7 +10,6 @@ export const PHASE = Object.freeze({
   IDLE: 'idle',
   QUEUED: 'queued',
   THINKING: 'thinking',
-  TOOL: 'tool',
   WAITING: 'waiting',
   DONE: 'done',
   ERROR: 'error',
@@ -43,12 +42,11 @@ export const THRESHOLDS = Object.freeze({
 });
 
 export const PET_BADGES = Object.freeze({
-  [PHASE.OFFLINE]: '📴',
-  [PHASE.IDLE]: '😴',
-  [PHASE.QUEUED]: '…',
-  [PHASE.THINKING]: '💡',
-  [PHASE.TOOL]: '🛠️',
+  [PHASE.OFFLINE]: '💤',
+  [PHASE.IDLE]: '🦞',
+  [PHASE.QUEUED]: '⏳',
+  [PHASE.THINKING]: '🧠',
   [PHASE.WAITING]: '✋',
   [PHASE.DONE]: '✅',
-  [PHASE.ERROR]: '❌',
+  [PHASE.ERROR]: '⚠️',
 });
